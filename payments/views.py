@@ -11,6 +11,7 @@ from django.views.generic import TemplateView
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
+from django.shortcuts import redirect, render
 
 import stripe
 
@@ -90,7 +91,10 @@ def change_card(request):
         data = {}
     except stripe.CardError as e:
         data = {"error": smart_str(e)}
-    return _ajax_response(request, "payments/_change_card_form.html", **data)
+
+    if request.is_ajax():
+        return _ajax_response(request, "payments/_change_card_form.html", **data)
+    return render(request, "payments/change_card.html", RequestContext(request, data))
 
 
 @require_POST
@@ -141,7 +145,10 @@ def subscribe(request, form_class=PlanForm):
     else:
         data["error"] = form.errors
         data["form"] = form
-    return _ajax_response(request, "payments/_subscribe_form.html", **data)
+
+    if request.is_ajax():
+        return _ajax_response(request, "payments/_subscribe_form.html", **data)
+    return render(request, "payments/subscribe.html", RequestContext(request, data))
 
 
 @require_POST
