@@ -7,7 +7,7 @@ from django.http import HttpResponse
 from django.template import RequestContext
 from django.template.loader import render_to_string
 from django.utils.encoding import smart_str
-from django.views.generic import TemplateView
+from django.views.generic import TemplateView, FormView
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
@@ -92,6 +92,7 @@ def change_card(request):
     except stripe.CardError as e:
         data = {"error": smart_str(e)}
 
+    data["STRIPE_PUBLIC_KEY"]= app_settings.STRIPE_PUBLIC_KEY
     if request.is_ajax():
         return _ajax_response(request, "payments/_change_card_form.html", **data)
     return render(request, "payments/change_card.html", RequestContext(request, data))
@@ -146,6 +147,7 @@ def subscribe(request, form_class=PlanForm):
         data["error"] = form.errors
         data["form"] = form
 
+    data["STRIPE_PUBLIC_KEY"]= app_settings.STRIPE_PUBLIC_KEY
     if request.is_ajax():
         return _ajax_response(request, "payments/_subscribe_form.html", **data)
     return render(request, "payments/subscribe.html", RequestContext(request, data))
