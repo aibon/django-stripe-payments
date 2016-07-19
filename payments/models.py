@@ -25,7 +25,8 @@ from .settings import (
     plan_from_stripe_id,
     SEND_EMAIL_RECEIPTS,
     TRIAL_PERIOD_FOR_USER_CALLBACK,
-    PLAN_QUANTITY_CALLBACK
+    PLAN_QUANTITY_CALLBACK,
+    TAX
 )
 from .signals import (
     cancelled,
@@ -508,6 +509,7 @@ class Customer(StripeObject):
                 sub_obj.cancel_at_period_end = sub.cancel_at_period_end
                 sub_obj.start = convert_tstamp(sub.start)
                 sub_obj.quantity = sub.quantity
+                sub_obj.tax_percent = sub.tax_percent
                 sub_obj.save()
             except CurrentSubscription.DoesNotExist:
                 sub_obj = CurrentSubscription.objects.create(
@@ -524,7 +526,8 @@ class Customer(StripeObject):
                     status=sub.status,
                     cancel_at_period_end=sub.cancel_at_period_end,
                     start=convert_tstamp(sub.start),
-                    quantity=sub.quantity
+                    quantity=sub.quantity,
+                    tax_percent=sub.tax_percent
                 )
 
             if sub.trial_start and sub.trial_end:
@@ -558,6 +561,8 @@ class Customer(StripeObject):
                 datetime.datetime.utcnow() + datetime.timedelta(days=trial_days)
         if token:
             subscription_params["card"] = token
+        if TAX:
+            subscription_params["tax_percent"] = decimal.Decimal(TAX)
 
         subscription_params["plan"] = PAYMENTS_PLANS[plan]["stripe_plan_id"]
         subscription_params["quantity"] = quantity
@@ -625,6 +630,7 @@ class CurrentSubscription(models.Model):
     amount = models.DecimalField(decimal_places=2, max_digits=9)
     currency = models.CharField(max_length=10, default="usd")
     created_at = models.DateTimeField(default=timezone.now)
+    tax_percent = models.DecimalField(decimal_places=2, max_digits=5, null=True)
 
     @property
     def total_amount(self):
@@ -680,6 +686,8 @@ class Invoice(models.Model):
     date = models.DateTimeField()
     charge = models.CharField(max_length=50, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
+    tax_percent = models.DecimalField(decimal_places=2, max_digits=5, null=True)
+    tax = models.DecimalField(decimal_places=2, max_digits=9, null=True)
 
     class Meta:  # pylint: disable=E0012,C1001
         ordering = ["-date"]
@@ -717,7 +725,9 @@ class Invoice(models.Model):
                 total=convert_amount_for_db(stripe_invoice["total"], stripe_invoice["currency"]),
                 currency=stripe_invoice["currency"],
                 date=date,
-                charge=stripe_invoice.get("charge") or ""
+                charge=stripe_invoice.get("charge") or "",
+                tax=convert_amount_for_db(stripe_invoice["tax"], stripe_invoice["currency"]),
+                tax_percent=decimal.Decimal(stripe_invoice["tax_percent"])
             )
         )
         if not created:
@@ -733,6 +743,8 @@ class Invoice(models.Model):
             invoice.currency = stripe_invoice["currency"]
             invoice.date = date
             invoice.charge = stripe_invoice.get("charge") or ""
+            invoice.tax=convert_amount_for_db(stripe_invoice["tax"], stripe_invoice["currency"]),
+            invoice.tax_percent=decimal.Decimal(stripe_invoice["tax_percent"])
             invoice.save()
 
         for item in stripe_invoice["lines"].get("data", []):

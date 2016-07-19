@@ -41,6 +41,11 @@ if isinstance(PLAN_QUANTITY_CALLBACK, six.string_types):
 
 SEND_EMAIL_RECEIPTS = getattr(settings, "SEND_EMAIL_RECEIPTS", True)
 
+TAX = getattr(
+    settings,
+    "PAYMENTS_TAX",
+    None
+)
 
 def plan_from_stripe_id(stripe_id):
     for key in PAYMENTS_PLANS.keys():
